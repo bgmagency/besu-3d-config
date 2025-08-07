@@ -133,7 +133,7 @@ export default function ViewerPage() {
 
   return (
     <div style={{ width: '100%', height: '100%', position: 'relative' }}>
-      <Canvas gl={{ antialias: true }} camera={{ position: [0, 1.5, 3.2], fov: 40 }}>
+     <Canvas gl={{ antialias: true, preserveDrawingBuffer: true }} camera={{ position: [0, 1.5, 3.2], fov: 40 }}>
         <ambientLight intensity={0.6} />
         <directionalLight position={[3, 5, 4]} intensity={1.2} />
         <Environment preset="city" />
