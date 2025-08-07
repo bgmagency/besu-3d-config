@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 const DEFAULTS = {
   sport: 'basketball', base_style: 'classic', view_side: 'front',
@@ -12,22 +12,30 @@ type Design = typeof DEFAULTS;
 
 export default function Designer() {
   const [design, setDesign] = useState<Design>(DEFAULTS);
+  const [parentOrigin, setParentOrigin] = useState<string>('');
+  const [viewerUrl, setViewerUrl] = useState<string>('');
   const iframeRef = useRef<HTMLIFrameElement>(null);
 
-  const parentOrigin = useMemo(() => window.location.origin, []);
-  const viewerUrl = useMemo(() => `/viewer?parentOrigin=${encodeURIComponent(parentOrigin)}`, [parentOrigin]);
-
-  const sendState = useRef<number | null>(null);
+  // Compute origin/iframe URL on the client only
   useEffect(() => {
-    if (!iframeRef.current?.contentWindow) return;
-    if (sendState.current) window.clearTimeout(sendState.current);
-    sendState.current = window.setTimeout(() => {
-      iframeRef.current!.contentWindow!.postMessage({ type: 'state', design }, window.origin);
-    }, 120);
-  }, [design]);
+    const origin = window.location.origin;
+    setParentOrigin(origin);
+    setViewerUrl(`/viewer?parentOrigin=${encodeURIComponent(origin)}`);
+  }, []);
 
+  // Debounced postMessage → only after origin + iframe exist
+  useEffect(() => {
+    if (!parentOrigin || !iframeRef.current?.contentWindow) return;
+    const t = window.setTimeout(() => {
+      iframeRef.current!.contentWindow!.postMessage({ type: 'state', design }, parentOrigin);
+    }, 120);
+    return () => window.clearTimeout(t);
+  }, [design, parentOrigin]);
+
+  // Receive snapshot url (guard by origin)
   useEffect(() => {
     function onMsg(e: MessageEvent) {
+      if (e.origin !== parentOrigin) return;
       const m = e.data || {};
       if (m.type === 'snapshot_url' && m.url) {
         alert('Snapshot uploaded: ' + m.url);
@@ -35,14 +43,23 @@ export default function Designer() {
     }
     window.addEventListener('message', onMsg);
     return () => window.removeEventListener('message', onMsg);
-  }, []);
+  }, [parentOrigin]);
 
   return (
     <main style={{ display: 'grid', gridTemplateColumns: '1.2fr 0.8fr', gap: 18, padding: 16 }}>
       <section>
-        <iframe ref={iframeRef} src={viewerUrl} style={{ width: '100%', height: 720, border: 0 }} />
-        <p style={{ color: '#666', fontSize: 12 }}>If nothing renders, open <a href="/viewer" target="_blank">/viewer</a> directly to debug.</p>
+        {viewerUrl ? (
+          <iframe ref={iframeRef} src={viewerUrl} style={{ width: '100%', height: 720, border: 0 }} />
+        ) : (
+          <div style={{height:720,display:'grid',placeItems:'center',border:'1px solid #eee'}}>
+            Loading viewer…
+          </div>
+        )}
+        <p style={{ color: '#666', fontSize: 12 }}>
+          If nothing renders, open <a href="/viewer" target="_blank">/viewer</a> directly to debug.
+        </p>
       </section>
+
       <aside>
         <h2>Controls</h2>
         <div style={{ display: 'grid', gap: 12 }}>
