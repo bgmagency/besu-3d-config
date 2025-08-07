@@ -1,0 +1,1 @@
+Drop classic.glb here when ready. The viewer works without it using a primitive box jersey.
